@@ -25,9 +25,28 @@ from Tkinter import *
 Tk = Tk or globals()['Tk']
 
 # __import__('os').chdir('/home/DuangSUSE/Projects/VisualGimp/')
-# GEPL = True
-# execfile('GimpApi.py')
-# execfile('VisualGimp.py')
+# GEPL = True; execfile('GimpApi.py'); execfile('VisualGimp.py')
+
+#from __builtin___ import execfile
+
+require = lambda x: globals()[x]
+
+_globalq = require('_globalq')
+execfile = _globalq('execfile')
+
+from io import FileIO
+
+if (callable(execfile) is not True):
+  def __execfile(name):
+    try:
+      f = FileIO(name)
+      codestr = f.read()
+      exec(codestr)
+    except:
+      raise RuntimeError('Failed to execute file %s' % name)
+    finally: f.close()
+  if execfile is None: execfile = __execfile
+  #del __execfile
 
 def up():
   execfile('VisualGimp.py')
@@ -111,6 +130,13 @@ class VisualGimp (GimpAccess):
   date: Apr, 2019
   '''
 
+  def _initialized(self):
+    instance = self()
+    instance.check_layers()
+    return instance
+
+  init = classmethod(_initialized)
+
   def check_layers(self):
     ''' Register and check for VisualGimp layers '''
 
@@ -120,13 +146,27 @@ class VisualGimp (GimpAccess):
       except IndexError as e:
         self.message(e)
         return None
-    
+
+    def layerGroup(layerCheckFn):
+      ''' Ensures a layer is a layer group, or display script error message '''
+      def _check(x):
+        result = layerCheckFn(x)
+        if result is None or not self.layer_is_group(result):
+          name = result.name if result else '*missing %s*' % x
+          message = '-*- VisualGimp Data ERROR -*- %s is NOT a group layer' % name
+          self.message(message)
+          raise TypeError(message)
+        return result
+      return _check
+
+    checkLayerGroup = layerGroup(checkLayer)
+
     self.l_code = checkLayer('Code')
-    self.l_vals = checkLayer('Vals')
+    self.l_vals = checkLayerGroup('Vals')
 
     self.l_trace = checkLayer('Trace')
-    self.l_vis = checkLayer('Visual')
-    self.l_pts = checkLayer('Pointers')
+    self.l_vis = checkLayerGroup('Visual')
+    self.l_pts = checkLayerGroup('Pointers')
 
   def traceMap(self):
     ''' Get value trace map from source '''
@@ -193,9 +233,10 @@ class VisualGimp (GimpAccess):
   def _valLayers(self): return self.l_vals
   valLayer = property(_valLayers)
 
-  def codePointerLayer(self):
+  def _codePointerLayer(self):
     ''' Get code pointers layer '''
     return self.l_pts
+  codePointerLayer = property(_codePointerLayer)
 
   def pointerLayerOf(self, name):
     ''' Get the pointers layer of visual '''

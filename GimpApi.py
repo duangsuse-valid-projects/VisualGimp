@@ -1,5 +1,10 @@
 # -*- encoding: utf-8 -*-
 
+# author: duangsuse
+# date: May 2019
+
+# Utility toolbox for the GNU image manipulation program
+
 def infseq(x):
   ''' Infinity generator of x '''
   while True: yield x
@@ -51,6 +56,23 @@ def uh(obj, do = lambda x: x):
   ''' if obj is not None, run uh, else return None '''
   if obj is not None: return do(obj)
   else: return None
+
+
+def _trimMarks(m, bracel = '<', bracer = '>'):
+  ''' remove format strs of SGML markup '''
+  output = str()
+  waitClose = False
+  if len(m) == 0: return output
+  for i in range(0, len(m)):
+    char = m[i]
+    if char == bracel: waitClose = True
+    if waitClose:
+      if char == bracer: waitClose = False
+    else: output += char
+  return output
+
+def _hexdigit(n): return hex(n)[2:]
+
 
 class GimpAccess:
   '''
@@ -140,11 +162,14 @@ class GimpAccess:
 
       raises IndexError if more or less than 1 element found
     '''
-    if self.layer_is_group(layers): layers = self.layer_get_children(layers)
+    layers_name = '*indexable*'
+    if self.layer_is_group(layers):
+      layers = self.layer_get_children(layers)
+      layers_name = layers.name
     if index is not None:
       if type(index) is str:
         layer_names = map(lambda l: l.name, layers)
-        if index not in layer_names: raise IndexError("Cannot find name {} in {} items".format(index, len(layer_names)))
+        if index not in layer_names: raise IndexError("Cannot find name {} in {} items (namely {})".format(index, len(layer_names), layers_name))
         found = filter(lambda nq: nq[0] == index, zip(layer_names, layers))
         if len(found) != 1: raise IndexError("More or less than 1 element with name %s found in %s" % index % str(layers))
         return list(found)[0][1]
@@ -195,26 +220,11 @@ class GimpAccess:
 
     return base
 
-  def _trimMarks(self, m, bracel = '<', bracer = '>'):
-    ''' remove format strs of SGML markup '''
-    output = str()
-    waitClose = False
-    if len(m) == 0: return output
-    for i in range(0, len(m)):
-      char = m[i]
-      if char == bracel: waitClose = True
-      if waitClose:
-        if char == bracer: waitClose = False
-      else: output += char
-    return output
-
-  trimMarks = classmethod(_trimMarks)
+  trimMarks = staticmethod(_trimMarks)
 
   # Others
 
-  def _hexdigit(self, n): return hex(n)[2:]
-
-  hexDigit = classmethod(_hexdigit)
+  hexDigit = staticmethod(_hexdigit)
 
   def _rgb2Hex(self, rgb):
     # return "#" + hexdigit(rgb.r) + hexdigit(rgb.g) + hexdigit(rgb.b) + hexdigit(rgb.a)
@@ -249,11 +259,40 @@ class GimpAccess:
   forecolor = property(color_foreground, color_foreground_set, doc = 'GIMP instance foreground color')
   backcolor = property(color_background, color_background_set, doc = 'GIMP instance foreground color')
 
+from os import linesep
 class MarkupBuilder:
   ''' Gimp Markup SGML builder '''
-  def __init__(self):
-    self.marks = str()
+  def __init__(self, indent = -1, nl = linesep, buffer = str):
+    self.marks = buffer()
     self.tag_stack = list()
+
+    self.nl = nl
+    self.indent = indent
+    self.last_spaces = 0
+
+    self.revert_last_indent_size = 0
+
+    self.last_is_text = False
+
+  '''
+  Indent rules:
+
+  when starting new tag, write last spaces, last spaces += indent
+  if new tag is not text tag start (inner is just text), write newline
+  when leaving tag, last spaces -= indent
+  '''
+  def useindent(self): return self.indent != -1
+  indented = property(useindent)
+  def wnewline(self):
+    ''' see use_indent'''
+    self.marks += self.nl
+  def windent(self):
+    ''' see use_indent'''
+    wrote = 0
+    for _ in range(0, self.last_spaces):
+      self.marks += ' '
+      wrote += 1 # dummy?
+    return wrote
 
   def begin(self, tag, attrs = {}):
     '''
@@ -261,6 +300,7 @@ class MarkupBuilder:
 
     Attribute name, value and tag name is escaped
     '''
+    self.last_is_text = False
     attrst = str()
     tagscape = self.escape(tag)
 
@@ -272,10 +312,20 @@ class MarkupBuilder:
         #print(ary)
         #print(n)
         attrst += "\"%s\"" % self.escape(str(ary[n+1]))
+
     self.marks += '<' + tagscape
     if len(attrs) != 0: self.marks += ' '
     self.marks += attrst + '>'
+
+    # always write indents for next line
+    # makes its possible to drop last indent (text tag)
+    if self.indented:
+      self.last_spaces += self.indent
+      self.wnewline()
+      self.revert_last_indent_size = self.windent() +1
+
     self.tag_stack.append(tagscape)
+    return self
 
   def make(self): return self.marks
 
@@ -287,6 +337,7 @@ class MarkupBuilder:
     with xml.tag('span', {color: '#66ccff'}):
       xml % 'Q \w\ Q'
     '''
+    self.last_is_text = False
     class TagBuilder:
       def __init__(self, xml):
         self.xml = xml
@@ -298,11 +349,57 @@ class MarkupBuilder:
 
   def text(self, content):
     ''' append text content '''
+    self.last_is_text = True
+    if self.indented:
+      self.marks = self.marks[:-self.revert_last_indent_size]
     self.marks += self.escape(content)
+    return self
+
+  #@staticmethod
+  #def test():
+  #  m = MarkupBuilder(2)
+  #  m > 'html'
+  #  m > 'head'
+  #  m > 'title'
+  #  m < 'Hello World'
+  #  m <= 2
+  #  m > 'body'
+  #  m < 'String'
+  #  m >= ['a', {'id': 'str'}]
+  #  m < '|sg.'
+  #  m <= 3
+  #  return m
 
   def end(self):
     ''' delimites last tag '''
+    if not self.last_is_text: # cancel indentation
+      #print(self.indent, self.tag_stack)
+      self.marks = self.marks[:-self.revert_last_indent_size]
+      self.wnewline()
+      self.last_spaces -= self.indent
+      self.revert_last_indent_size = self.windent() +1
+      self.last_spaces += self.indent
+
     self.marks += '</' + self.tag_stack.pop() + '>'
+
+    if self.indented:
+      self.wnewline()
+      self.last_spaces -= self.indent
+      self.revert_last_indent_size = self.windent() +1
+
+    self.last_is_text = False
+
+  # Not cared by Markup indent emitter
+  def raw(self, raw):
+    ''' write raw text (unescaped) '''
+    self.marks += raw
+    return self
+
+  def rawtag(self, rawtext):
+    ''' append unescaped raw <> text '''
+    self.marks += '<'
+    self.marks += rawtext
+    self.marks += '>'
 
   def _escape(self, xml):
     '''
@@ -334,8 +431,13 @@ class MarkupBuilder:
     ''' M(marks)..[tag stack] '''
     return 'M(' + self.marks + ')..' + str(self.tag_stack)
 
-  __lt__ = text
-  __gt__ = begin
+  __lt__ = text # chain
+  __gt__ = begin # chain
+  __add__ = raw # chain
+
+  def __contains__(self, tag):
+    ''' is tag inside enclosing tags ? '''
+    return tag in self.tag_stack
 
   def __ge__(self, tag_attr):
     ''' xml >= ['markup', {'name': 'abcs'}] '''
