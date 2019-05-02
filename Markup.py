@@ -43,7 +43,7 @@ class MarkupBuilder:
     return wrote
   def cancel_indent(self):
     ''' cancel last indent '''
-    self.marks = self.marks[:-self.revert_last_indent_size]
+    if self.indented: self.marks = self.marks[:-self.revert_last_indent_size]
   def do_indent(self, entering = True):
     ''' Write indent, increase last_spaces, saving wrote spaces and newline to revert_last_indent_size '''
     def do():
@@ -117,22 +117,22 @@ class MarkupBuilder:
     self.marks += self.escape(content)
     return self
 
-  # @staticmethod
-  # def test():
-  #   m = MarkupBuilder(2)
-  #   m > 'html'
-  #   m > 'head'
-  #   m > 'title'
-  #   m < 'Hello World'
-  #   m <= 2
-  #   m > 'body'
-  #   m > 'text'
-  #   with m.tag("b"):
-  #     m < 'String'
-  #   m >= ['a', {'id': 'str'}]
-  #   m < '|sg.'
-  #   m <= 4
-  #   return m
+  #@staticmethod
+  #def test():
+  #  m = MarkupBuilder()
+  #  m > 'html'
+  #  m > 'head'
+  #  m > 'title'
+  #  m < 'Hello World'
+  #  m <= 2
+  #  m > 'body'
+  #  m > 'text'
+  #  with m.tag("b"):
+  #    m < 'String'
+  #  m >= ['a', {'id': 'str'}]
+  #  m < '|sg.'
+  #  m <= 4
+  #  return m
 
   def end(self):
     ''' delimites last tag '''
