@@ -5,6 +5,11 @@
 
 # Utility toolbox for the GNU image manipulation program
 
+from sys import path as pypath
+from os import path
+
+pypath.append(path.abspath(path.curdir))
+
 from Util import _globalq, uh, _trimMarks, _hexdigit
 
 class GimpAccess:
@@ -26,6 +31,7 @@ class GimpAccess:
     pdb: PDB CNI binding default gimp.pdb
     '''
     if not callable (gimp.message): raise AssertionError("Not a GIMP")
+    if pdb is None: pdb = gimp.pdb
     if not callable (pdb.gimp_text_layer_get_markup): raise AssertionError("Not GIMP PDB: gimp_text_layer_get_markup checked")
 
     self.api = gimp

@@ -49,8 +49,8 @@ if (callable(execfile) is not True):
   #del __execfile
 
 def up():
-  execfile('VisualGimp.py')
-  v = VisualGimp()
+  #execfile('VisualGimp.py')
+  v = VisualGimp(globals()['gimp'])
   v.check_layers()
   v.main()
 
@@ -181,7 +181,9 @@ class VisualGimp (GimpAccess):
 
   ensure = lambda oid: globals()[oid]
 
-  _TEMPLATE = ensure('MarkupBuilder')()
+  from Markup import MarkupBuilder as Builder
+
+  _TEMPLATE = Builder()
   _TEMPLATE.begin('span', {'foreground': '{color}'})
   _TEMPLATE < '{}'
   _TEMPLATE <= 1
@@ -201,7 +203,7 @@ class VisualGimp (GimpAccess):
 
   del _TEMPLATE
 
-  _TEMPLATE = ensure('MarkupBuilder')()
+  _TEMPLATE = Builder()
   _TEMPLATE > 'markup'
   _TEMPLATE < '{}'
   _TEMPLATE <= 1
@@ -251,3 +253,4 @@ class VisualGimp (GimpAccess):
     self.check_layers()
     Gui(self).show()
 
+if __name__ == '__main__': up()

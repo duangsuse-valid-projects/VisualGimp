@@ -47,7 +47,7 @@ def stream_join(xs, ys):
     yield yss.next() # StopIteration?
 
 def _globalq(name):
-  ''' Get a global by name or None '''
+  ''' Get a (maybe MODULE-wise) global by name or None '''
   _globals = globals()
   if name in _globals: return _globals[name]
   else: return None
