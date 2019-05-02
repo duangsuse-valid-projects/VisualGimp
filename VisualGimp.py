@@ -23,7 +23,7 @@ elif (lambda x: x.access(GIMP_API, x.R_OK))(__import__('os')):
 else:
   raise LookupError('Failed to execute API delegate!')
 
-from Tkinter import *
+from tkinter import *
 
 Tk = Tk or globals()['Tk']
 
