@@ -212,11 +212,11 @@ class Gui (Thread):
     return listener
 
   def updateClicked(self):
-    old = self.thisTrace
+    old = self.thisTrace.copy()
     changeset_count = 0
     while len(self.trace_edits) !=0:
       (k, nv) = self.trace_edits.popleft()
-      old[k] = nv[1]
+      old[k] = nv
       changeset_count += 1
     #print(old)
     if changeset_count != 0: self.ds.text_layer_marks_set(self.ds.traceLayer, self.ds.formatTrace(old, True))
