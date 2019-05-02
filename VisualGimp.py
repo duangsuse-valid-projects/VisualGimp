@@ -97,13 +97,15 @@ class Gui (Thread):
     self.export_lambda = id #:0
     self.trace_edits = deque()
 
+    self.trace_ptr_lastshown = {}
+
   def _export(self):
     ''' increase export index for calling extension lambda '''
     if self.export_lambda is not None: self.export_lambda(self.export_index)
     self.export_index += 1
   def __convert_traceDict(self, trace):
-    ''' convert and return int trace indices '''
-    return map(lambda kv: int(kv[1]), trace.items())
+    ''' convert and return int trace dict of indices '''
+    return dict(map(lambda kv: (kv[0], int(kv[1])), trace.items()))
   _convert_traceDict = __convert_traceDict
 
   def bind(self):
@@ -208,7 +210,7 @@ class Gui (Thread):
           break
       if changed: self.trace_edits.append((key, newvalue))
       #print(key, newvalue)
-      self.lastTrace[key] = newvalue
+      self.thisTrace[key] = newvalue # apply changes to current map
     return listener
 
   def updateClicked(self):
@@ -217,15 +219,42 @@ class Gui (Thread):
     while len(self.trace_edits) !=0:
       (k, nv) = self.trace_edits.popleft()
       old[k] = nv
+      self.lastTrace[k] = nv # GIMP textual trace repr
       changeset_count += 1
     #print(old)
     if changeset_count != 0: self.ds.text_layer_marks_set(self.ds.traceLayer, self.ds.formatTrace(old, True))
 
+  FRAME_PATTERN = compile(r'^(\w+) by (\w)+$')
   def refreshFrame(self):
-    pass
+    refreshing = [] # name to trace record (str by lastPath)
+    for k in self.ds.visualLayer.children:
+      spec = k.name
+      m = self.FRAME_PATTERN.match(spec)
+      groups = m.groups()
+      if len(groups) == 2:
+        refreshing.append((groups[1], groups[0]))
+      else:
+        self.ds.message('Failed matching name {}, try follow pattern of pointerName by traceVariable?'.format(k))
+
+    t2n = dict(refreshing)
+    print(t2n)
+    origin = self.thisTrace
+    mapped = self._convert_traceDict(self.thisTrace)
+    for key in origin.keys():
+      if key not in t2n: continue
+      ptr = mapped[key]
+      layer = self.ds.pointerLayerOf(t2n[key])
+      print(ptr, layer)
+      if key in self.trace_ptr_lastshown:
+        self.ds.layer_hide(self.trace_ptr_lastshown[key])
+
+      if not self.ds.layer_is_group(layer) or len(layer.children) <= ptr:
+        self.ds.message('Failed to change cursor for {}: Not a group or length </= index {} '.format(key, ptr))
+      self.ds.layer_show(layer.children[ptr])
+      self.trace_ptr_lastshown[key] = ptr
 
   def do_export(self):
-    pass
+    self._export()
 
   # 辣鸡代码，请见谅
   def cr_children(self): return self.ds.layer_get_children(self.ds.codePointerLayer)
