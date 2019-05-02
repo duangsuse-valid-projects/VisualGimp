@@ -6,6 +6,7 @@ from os import linesep as sep
 from re import match, compile
 
 from threading import Thread
+from time import time
 
 LET_RE = compile(r'(\w+)\s*=\s*(.+)$')
 
@@ -57,13 +58,15 @@ def up():
   v.main()
   return v
 
-class Gui:
+class Gui (Thread):
   ''' The GUI interface of this program '''
 
   CODE_PTR_MESG = " - Code Pointer Control @ %i - "
 
   def __init__(self, visual):
     self.ds = visual # data source
+    Thread.__init__(self) # target=run
+    self.ui = None
 
     self.lastTrace = None
     self.thisTrace = None
@@ -71,21 +74,47 @@ class Gui:
     self.codeArrow = None
     self.lastArrowSet = 0 # code arrow
 
+    self.sync = None
+    self.update = None
+
+    self.publish = None
+
+    self.code_rst = None
+    self.code_mup = None
+    self.code_mdn = None
+    self.cp_tvar = None
+
+    self.export_index = 0
+    self.export_code = None
+    self.export = None
+
+  def bind(self):
+    ''' Make widgets in app thread '''
     self.ui = Tk()
     self.sync = Button(self.ui, text = "Sync variable trace", command = self.syncClicked)
     self.update = Button(self.ui, text = "Update variable trace", command = self.updateClicked)
-
     self.publish = Button(self.ui, text = "Refresh traced arrows", command = self.refreshFrame)
-
     self.code_rst = Button(self.ui, text = "Move code arrow 0", command = self.crReset)
     self.code_mup = Button(self.ui, text = "Move code arrow ↑", command = self.crDec)
     self.code_mdn = Button(self.ui, text = "Move code arrow ↓", command = self.crInc)
-
-    self.export_index = 0
+    self.cp_tvar = StringVar()
+    self.cp_tvar.set(self.CODE_PTR_MESG %self.lastArrowSet)
     self.export_code = Entry(self.ui)
     self.export = Button(self.ui, text = "✔ Export Frame", command = self.do_export)
 
+  def run(self):
+    Thread.run(self)
+    self.show()
+    self.ui.mainloop()
+
+  def app_start(self):
+    self.setName('GimpVisual Tk Application at ' + str(time()))
+    #self.setDaemon(False)
+    self.start()
+
   def show(self):
+    ''' Bind widgets in application thread '''
+    self.bind()
     name = Label(self.ui, text = " - Variable Trace Text Layer - ", justify = CENTER, anchor = W, fg = "green")
     name.pack()
 
@@ -100,7 +129,7 @@ class Gui:
     separator1 = Frame(self.ui, height = 10, bd = 1, relief = SUNKEN, bg = "green")
     separator1.pack(fill=X, padx=2, pady=2)
 
-    name1 = Label(self.ui, text = self.CODE_PTR_MESG %self.lastArrowSet, justify = CENTER, fg = "green")
+    name1 = Label(self.ui, textvariable = self.cp_tvar, justify = CENTER, fg = "green")
     name1.pack()
     self.codeArrow = name1
 
@@ -108,7 +137,7 @@ class Gui:
     self.code_mup.pack()
     self.code_mdn.pack()
 
-    separator2 = Frame(height=20, bd=1, relief=FLAT)
+    separator2 = Frame(self.ui, height=20, bd=1, relief=FLAT)
     separator2.pack(fill=X, padx=20, pady=5)
 
     self.export.pack()
@@ -122,13 +151,6 @@ class Gui:
     self.ui.wm_attributes('-topmost')
 
     self.focus()
-
-    fn = self.ui.mainloop
-    loop = Thread(target=fn)
-    loop.setDaemon(False)
-    loop.setName("Tk event loop thread")
-    loop.start()
-    loop.join()
 
   def focus(self): self.ui.focus_set()
 
@@ -157,7 +179,7 @@ class Gui:
     if children >= 1:
       self.ds.layer_show(children[0])
     self.lastArrowSet = 0
-    self.codeArrow.text = self.CODE_PTR_MESG % 0
+    self.cp_tvar.set( self.CODE_PTR_MESG % 0 )
     self.codeArrow.update()
     #self.cr_refresh()
   def crInc(self):
@@ -167,7 +189,7 @@ class Gui:
     last = self.lastArrowSet
     self.ds.layer_show(children[last + 1])
     self.lastArrowSet += 1
-    self.codeArrow.text = self.CODE_PTR_MESG % (last + 1)
+    self.cp_tvar.set( self.CODE_PTR_MESG % (last + 1) )
     self.codeArrow.update()
     #self.cr_refresh()
   def crDec(self):
@@ -177,8 +199,8 @@ class Gui:
     last = self.lastArrowSet
     self.ds.layer_show(children[last - 1])
     self.lastArrowSet -= 1
-    self.codeArrow.text = self.CODE_PTR_MESG % (last - 1)
-    self.codeArrow.update()
+    self.cp_tvar.set( self.CODE_PTR_MESG % (last - 1) )
+    #self.codeArrow.update()
     #self.cr_refresh()
 
 class VisualGimp (GimpAccess):
@@ -313,6 +335,6 @@ class VisualGimp (GimpAccess):
     ''' Run this Python helper '''
     self.check_layers()
     self.gui = Gui(self)
-    self.gui.show()
+    #self.gui.app_start()
 
 if __name__ == '__main__': VG = up()
