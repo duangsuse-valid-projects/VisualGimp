@@ -100,6 +100,8 @@ class Gui (Thread):
     self.cp_tvar = StringVar()
     self.cp_tvar.set(self.CODE_PTR_MESG %self.lastArrowSet)
     self.export_code = Entry(self.ui)
+    self.convert_trace_code = Entry(self.ui)
+    self.btn_update_convert_trace_code = Button(self.ui, text = "Compile", command = self.updateConverter)
     self.export = Button(self.ui, text = "✔ Export Frame", command = self.do_export)
 
   def run(self):
@@ -144,6 +146,9 @@ class Gui (Thread):
     name2 = Label(self.ui, text = "When exporting, run these code:", justify=CENTER, fg="red")
     name2.pack()
     self.export_code.pack()
+
+    name3 = Label(self.ui, text = "When converting trace table to indices, run these code:", justify=CENTER, fg="red")
+    name3.pack()
 
     self.ui.wm_deiconify()
     self.ui.wm_title(VisualGimp.__name__)
@@ -202,6 +207,9 @@ class Gui (Thread):
     self.cp_tvar.set( self.CODE_PTR_MESG % (last - 1) )
     #self.codeArrow.update()
     #self.cr_refresh()
+
+  def updateConverter(self):
+    pass
 
 class VisualGimp (GimpAccess):
   '''
