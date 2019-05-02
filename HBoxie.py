@@ -1,4 +1,4 @@
-''' coding: utf-8 '''
+# coding: utf-8
 
 from tkinter import Frame, LEFT, RIGHT, Label, Entry, Button, END
 
@@ -20,6 +20,11 @@ class TripleFrame:
     self.wa.pack(side=LEFT, padx=self.pad)
     if self.wc is not None: self.wc.pack(side=RIGHT)
     self.wb.pack(side=RIGHT, padx=self.pad)
+  def destroy(self):
+    self.wa.forget(); self.wa.destroy()
+    self.wb.forget(); self.wb.destroy()
+    if self.wc is not None: self.wc.forget(); self.wc.destroy()
+    self.frame.destroy()
   def get_a(self): return self.wa
   def get_b(self): return self.wb
   def get_c(self): return self.wc
@@ -45,10 +50,9 @@ class DictFrame:
     for (k, v) in dict.items():
       if type(k) is not str: check_failure('Key', k)
       if type(v) is not str: check_failure('Value', v)
-    self.update()
 
-  def update(self):
-    ''' redraw UI '''
+  def pack(self):
+    ''' Draw dict frame list UI '''
     if len(self.dict) is 0: return
     index = 0
     b = lambda p: Button(p, text='✔', command=self.call_changed(index))
@@ -60,6 +64,9 @@ class DictFrame:
       self.keys.append(k)
       self.ivs.append(iv)
       index += 1
+
+  def destroy(self):
+    for iv in self.ivs: iv.destroy()
 
   def listen(self, listener):
     '''

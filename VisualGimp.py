@@ -8,6 +8,12 @@ from re import match, compile
 from threading import Thread
 from time import time
 
+from HBoxie import DictFrame
+
+from collections import deque
+
+from Util import stream_join, concat_stream, nseq, compose, uh, infseq
+
 LET_RE = compile(r'(\w+)\s*=\s*(.+)$')
 
 # Gimp Python Script-Fu REPL, without import path configured correctly
@@ -69,7 +75,7 @@ class Gui (Thread):
     self.ui = None
 
     self.lastTrace = None
-    self.thisTrace = None
+    self.thisTrace = {}
 
     self.codeArrow = None
     self.lastArrowSet = 0 # code arrow
@@ -88,10 +94,23 @@ class Gui (Thread):
     self.export_code = None
     self.export = None
 
+    self.export_lambda = id #:0
+    self.trace_edits = deque()
+
+  def _export(self):
+    ''' increase export index for calling extension lambda '''
+    if self.export_lambda is not None: self.export_lambda(self.export_index)
+    self.export_index += 1
+  def __convert_traceDict(self, trace):
+    ''' convert and return int trace indices '''
+    return map(lambda kv: int(kv[1]), trace.items())
+  _convert_traceDict = __convert_traceDict
+
   def bind(self):
     ''' Make widgets in app thread '''
     self.ui = Tk()
     self.sync = Button(self.ui, text = "Sync variable trace", command = self.syncClicked)
+    self.dict_view = DictFrame(self.ui)
     self.update = Button(self.ui, text = "Update variable trace", command = self.updateClicked)
     self.publish = Button(self.ui, text = "Refresh traced arrows", command = self.refreshFrame)
     self.code_rst = Button(self.ui, text = "Move code arrow 0", command = self.crReset)
@@ -101,8 +120,10 @@ class Gui (Thread):
     self.cp_tvar.set(self.CODE_PTR_MESG %self.lastArrowSet)
     self.export_code = Entry(self.ui)
     self.convert_trace_code = Entry(self.ui)
-    self.btn_update_convert_trace_code = Button(self.ui, text = "Compile", command = self.updateConverter)
+    self.btn_update_codes = Button(self.ui, text = "Compile", command = self.updateConverter, justify=CENTER)
     self.export = Button(self.ui, text = "✔ Export Frame", command = self.do_export)
+    self.message = StringVar()
+    self.message_view = Label(self.ui, textvariable=self.message, justify=CENTER, fg="green")
 
   def run(self):
     Thread.run(self)
@@ -122,6 +143,8 @@ class Gui (Thread):
 
     self.sync.pack()
     self.update.pack()
+
+    self.dict_view.pack()
 
     separator = Frame(self.ui, height = 5, bd = 1, relief = FLAT)
     separator.pack(fill=X, padx=5, pady=20)
@@ -149,6 +172,10 @@ class Gui (Thread):
 
     name3 = Label(self.ui, text = "When converting trace table to indices, run these code:", justify=CENTER, fg="red")
     name3.pack()
+    self.convert_trace_code.pack()
+    self.btn_update_codes.pack()
+
+    self.message_view.pack()
 
     self.ui.wm_deiconify()
     self.ui.wm_title(VisualGimp.__name__)
@@ -160,9 +187,40 @@ class Gui (Thread):
   def focus(self): self.ui.focus_set()
 
   def syncClicked(self):
-    pass
+    ''' update dictview '''
+    traces = self.ds.traceMap()
+    if traces is None:
+      self.message.set('Cannot read trace pattern!')
+      return
+    self.lastTrace = self.thisTrace
+    self.thisTrace = traces
+    self.dict_view.destroy()
+    self.dict_view = DictFrame(self.ui, traces)
+    self.dict_view.listen(self.updateTrace())
+    self.dict_view.pack()
+
+  def updateTrace(self):
+    def listener(index, key, oldvalue, newvalue):
+      changed = False
+      for key in self.thisTrace.keys():
+        if key not in self.lastTrace or self.thisTrace[key] != self.lastTrace[key]:
+          changed = True
+          break
+      if changed: self.trace_edits.append((key, newvalue))
+      #print(key, newvalue)
+      self.lastTrace[key] = newvalue
+    return listener
+
   def updateClicked(self):
-    pass
+    old = self.thisTrace
+    changeset_count = 0
+    while len(self.trace_edits) !=0:
+      (k, nv) = self.trace_edits.popleft()
+      old[k] = nv[1]
+      changeset_count += 1
+    #print(old)
+    if changeset_count != 0: self.ds.text_layer_marks_set(self.ds.traceLayer, self.ds.formatTrace(old, True))
+
   def refreshFrame(self):
     pass
 
@@ -209,7 +267,22 @@ class Gui (Thread):
     #self.cr_refresh()
 
   def updateConverter(self):
-    pass
+    code_trace = self.convert_trace_code.get()
+    code_export = self.export_code.get()
+    info = list()
+
+    def compile_item(name, code, info):
+      result = id #;;
+      try:
+        result = eval(code)
+      except Exception as e:
+        info.append( '**{}'.format(str(e)) )
+      info.append( 'Compiled {} lambda: {}\n'.format(name, str(result)) )
+      return result
+
+    if len(code_export) is not 0: self.export_lambda = compile_item('export', code_export, info)
+    if len(code_trace) is not 0: self._convert_traceDict = compile_item('trace', code_trace, info)
+    self.message.set(concat_stream(stream_join(info, infseq("\n"))))
 
 class VisualGimp (GimpAccess):
   '''
@@ -263,18 +336,29 @@ class VisualGimp (GimpAccess):
     ''' Get value trace map from source '''
     marks = self.text_layer_marks(self.traceLayer)
     lines = GimpAccess.trimMarks(marks).split(sep)
-    matches = map(lambda l: globals()['uh'](LET_RE.match(l).groups(), lambda x: x[0:2]), filter(lambda l: l.strip()!='', lines))
+    vallines = filter(lambda l: l.strip()!='', lines)
+    matches = map(lambda l: uh(LET_RE.match(l), lambda x: x.groups()[0:2]), vallines)
     result = dict()
     #print(matches)
-    for (k, v) in matches:
-      result[k] = v
-    return result
+    #if type(matches) is not type(None):?????
+    it = matches.__iter__().next() if len(matches) > 0 else None
+    if it is not None:
+      #print(matches)
+      for kv in matches:
+        #print(k,v)
+        if kv is not None:
+          (k, v) = kv
+          result[k] = v
+        else: return None
+      return result
+    else: return None
 
   ensure = lambda oid: globals()[oid]
 
   from Markup import MarkupBuilder as Builder
 
   _TEMPLATE = Builder()
+  _TEMPLATE < '{} = '
   _TEMPLATE.begin('span', {'foreground': '{color}'})
   _TEMPLATE < '{}'
   _TEMPLATE <= 1
@@ -306,12 +390,13 @@ class VisualGimp (GimpAccess):
     ''' Make a new colored (foreground) markup for value trace '''
     #curry2 = ensure('curry2L')
     #flip = ensure('flipL')
-    join = lambda a, l: globals()['stream_join'](a, globals()['nseq']("\n", l - 1))
+    join = lambda a, l: stream_join(a, nseq("\n", l - 1))
     joinl = lambda l: join(l, len(l))
     template = self.TEMPLATE0 if updated else "{} = {}"
     # Bad flip_join = curry2(flip(joinl))("\n")
-    text = ensure('compose')(ensure('concat_stream'), joinl)(map(lambda i: template.format(i[0], i[1], color = self.rgb2Hex(self.forecolor)), trace.items()))
-    return self.TEMPLATE1.format(text, color = '#000000')
+    text = compose(concat_stream, joinl)(map(lambda i: template.format(i[0], i[1], color = self.rgb2Hex(self.forecolor)), trace.items()))
+    #print(self.TEMPLATE1.format(text))
+    return self.TEMPLATE1.format(text)
 
   def setTrace(self, *args, **kwargs):
     ''' Sets trace by map '''
