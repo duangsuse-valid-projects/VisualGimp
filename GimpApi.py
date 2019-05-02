@@ -103,8 +103,8 @@ class GimpAccess:
     '''
     layers_name = '*indexable*'
     if self.layer_is_group(layers):
-      layers = self.layer_get_children(layers)
       layers_name = layers.name
+      layers = self.layer_get_children(layers)
     if index is not None:
       if type(index) is str:
         layer_names = map(lambda l: l.name, layers)
@@ -127,10 +127,12 @@ class GimpAccess:
   def layer_hide(self, layer):
     ''' Make the layer hidden '''
     layer.visible = False
+    #layer.update(0,0, layer.width, layer.height)
 
   def layer_show(self, layer):
     ''' Make the layer shown '''
     layer.visible = True
+    #layer.update(0,0, layer.width, layer.height)
 
   def text_layer_marks(self, layer):
     ''' Get SGML markup of target text layer '''

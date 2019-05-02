@@ -5,6 +5,8 @@ GIMP_API = 'GimpApi.py'
 from os import linesep as sep
 from re import match, compile
 
+from threading import Thread
+
 LET_RE = compile(r'(\w+)\s*=\s*(.+)$')
 
 # Gimp Python Script-Fu REPL, without import path configured correctly
@@ -53,16 +55,21 @@ def up():
   v = VisualGimp(globals()['gimp'])
   v.check_layers()
   v.main()
+  return v
 
 class Gui:
   ''' The GUI interface of this program '''
+
+  CODE_PTR_MESG = " - Code Pointer Control @ %i - "
 
   def __init__(self, visual):
     self.ds = visual # data source
 
     self.lastTrace = None
     self.thisTrace = None
-    self.lastArrowSet = 0
+
+    self.codeArrow = None
+    self.lastArrowSet = 0 # code arrow
 
     self.ui = Tk()
     self.sync = Button(self.ui, text = "Sync variable trace", command = self.syncClicked)
@@ -71,8 +78,12 @@ class Gui:
     self.publish = Button(self.ui, text = "Refresh traced arrows", command = self.refreshFrame)
 
     self.code_rst = Button(self.ui, text = "Move code arrow 0", command = self.crReset)
-    self.code_mup = Button(self.ui, text = "Move code arrow ↑", command = self.crInc)
-    self.code_mdn = Button(self.ui, text = "Move code arrow ↓", command = self.crDec)
+    self.code_mup = Button(self.ui, text = "Move code arrow ↑", command = self.crDec)
+    self.code_mdn = Button(self.ui, text = "Move code arrow ↓", command = self.crInc)
+
+    self.export_index = 0
+    self.export_code = Entry(self.ui)
+    self.export = Button(self.ui, text = "✔ Export Frame", command = self.do_export)
 
   def show(self):
     name = Label(self.ui, text = " - Variable Trace Text Layer - ", justify = CENTER, anchor = W, fg = "green")
@@ -81,7 +92,7 @@ class Gui:
     self.sync.pack()
     self.update.pack()
 
-    separator = Frame(self.ui, height = 5, bd = 1, relief = SUNKEN)
+    separator = Frame(self.ui, height = 5, bd = 1, relief = FLAT)
     separator.pack(fill=X, padx=5, pady=20)
 
     self.publish.pack()
@@ -89,12 +100,21 @@ class Gui:
     separator1 = Frame(self.ui, height = 10, bd = 1, relief = SUNKEN, bg = "green")
     separator1.pack(fill=X, padx=2, pady=2)
 
-    name1 = Label(self.ui, text = " - Code Pointer Control - ", justify = CENTER, fg = "green")
+    name1 = Label(self.ui, text = self.CODE_PTR_MESG %self.lastArrowSet, justify = CENTER, fg = "green")
     name1.pack()
+    self.codeArrow = name1
 
     self.code_rst.pack()
     self.code_mup.pack()
     self.code_mdn.pack()
+
+    separator2 = Frame(height=20, bd=1, relief=FLAT)
+    separator2.pack(fill=X, padx=20, pady=5)
+
+    self.export.pack()
+    name2 = Label(self.ui, text = "When exporting, run these code:", justify=CENTER, fg="red")
+    name2.pack()
+    self.export_code.pack()
 
     self.ui.wm_deiconify()
     self.ui.wm_title(VisualGimp.__name__)
@@ -103,7 +123,12 @@ class Gui:
 
     self.focus()
 
-    mainloop()
+    fn = self.ui.mainloop
+    loop = Thread(target=fn)
+    loop.setDaemon(False)
+    loop.setName("Tk event loop thread")
+    loop.start()
+    loop.join()
 
   def focus(self): self.ui.focus_set()
 
@@ -114,12 +139,47 @@ class Gui:
   def refreshFrame(self):
     pass
 
+  def do_export(self):
+    pass
+
+  # 辣鸡代码，请见谅
+  def cr_children(self): return self.ds.layer_get_children(self.ds.codePointerLayer)
+  def cr_hide_last(self, childs): self.ds.layer_hide(childs[self.lastArrowSet])
+  def cr_overflow(self, off): return self.lastArrowSet + off not in range(0, len(self.cr_children())) or len(self.cr_children()) == 0
+  def cr_refresh(self):
+    it = self.ds.codePointerLayer
+    it.update(0, 0, it.width, it.height)
   def crReset(self):
-    pass
+    ''' Reset code cursor '''
+    for l in self.cr_children():
+      self.ds.layer_hide(l)
+    children = self.cr_children()
+    if children >= 1:
+      self.ds.layer_show(children[0])
+    self.lastArrowSet = 0
+    self.codeArrow.text = self.CODE_PTR_MESG % 0
+    self.codeArrow.update()
+    #self.cr_refresh()
   def crInc(self):
-    pass
+    if self.cr_overflow(1): return
+    children = self.cr_children()
+    self.cr_hide_last(children)
+    last = self.lastArrowSet
+    self.ds.layer_show(children[last + 1])
+    self.lastArrowSet += 1
+    self.codeArrow.text = self.CODE_PTR_MESG % (last + 1)
+    self.codeArrow.update()
+    #self.cr_refresh()
   def crDec(self):
-    pass
+    if self.cr_overflow(-1): return
+    children = self.cr_children()
+    self.cr_hide_last(children)
+    last = self.lastArrowSet
+    self.ds.layer_show(children[last - 1])
+    self.lastArrowSet -= 1
+    self.codeArrow.text = self.CODE_PTR_MESG % (last - 1)
+    self.codeArrow.update()
+    #self.cr_refresh()
 
 class VisualGimp (GimpAccess):
   '''
@@ -167,6 +227,7 @@ class VisualGimp (GimpAccess):
     self.l_trace = checkLayer('Trace')
     self.l_vis = checkLayerGroup('Visual')
     self.l_pts = checkLayerGroup('Pointers')
+    self.l_cpt = self.pointerLayerOf('code')
 
   def traceMap(self):
     ''' Get value trace map from source '''
@@ -237,12 +298,12 @@ class VisualGimp (GimpAccess):
 
   def _codePointerLayer(self):
     ''' Get code pointers layer '''
-    return self.l_pts
+    return self.l_cpt
   codePointerLayer = property(_codePointerLayer)
 
   def pointerLayerOf(self, name):
     ''' Get the pointers layer of visual '''
-    return self.layer_index(self.codePointerLayer, "p%ss" % name.lower())
+    return self.layer_index(self.l_pts, "p%ss" % name.lower())
 
   def valLayerOf(self, name):
     ''' Get the value layer of visual '''
@@ -251,6 +312,7 @@ class VisualGimp (GimpAccess):
   def main(self):
     ''' Run this Python helper '''
     self.check_layers()
-    Gui(self).show()
+    self.gui = Gui(self)
+    self.gui.show()
 
-if __name__ == '__main__': up()
+if __name__ == '__main__': VG = up()
