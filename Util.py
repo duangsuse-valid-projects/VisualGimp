@@ -161,6 +161,9 @@ def maybe(default, fn, may):
   if may is Nothing: return default
   else: fn(may.get())
 
+identity = lambda x:x
+typeof = type
+
 def fst(tup): return tup[0]
 def snd(tup): return tup[1]
 
@@ -179,56 +182,87 @@ def first_just(ls):
 
 class Either:
   ''' Either value a or b '''
-  def __init__(self, a_v, b_v):
+  def __init__(self, a_v = None, b_v = None):
     self.a = a_v; self.b = b_v
 
   def is_left(self):
-    pass
+    ''' Is Left exists? '''
+    return self.a is not None
   def is_right(self):
-    pass
+    ''' Is Right exists? '''
+    return self.b is not None
 
   left = property(is_left)
   right = property(is_right)
 
-  def get_left_or(self, fn_x_v):
-    pass
-  def get_right_or(self, fn_x_v):
-    pass
-
   def get_left(self):
-    pass
+    ''' Get Left or None '''
+    return self.a
   def get_right(self):
-    pass
+    ''' Get Right or None '''
+    return self.b
 
   l = property(get_left)
   r = property(get_right)
 
+  def get_left_or(self, fn_x_v):
+    ''' Get Left or run procedure / return default value '''
+    if self.left:
+      return self.l
+    else:
+      if callable(fn_x_v): return fn_x_v()
+      else: return fn_x_v
+  def get_right_or(self, fn_x_v):
+    ''' Get Right or run procedure / return default value '''
+    if self.right:
+      return self.r
+    else:
+      if callable(fn_x_v): return fn_x_v()
+      else: return fn_x_v
+
+  def _fail_assert(self, name):
+    def __(): raise AssertionError('Failed to get {} for {}'.format(name, self))
+    return __
+
   def must_get_left(self):
-    pass
+    ''' Get Left or throw assertion error '''
+    return self.get_left_or(self._fail_assert('left'))
   def must_get_right(self):
-    pass
+    ''' Get Right or throw assertion error '''
+    return self.get_right_or(self._fail_assert('right'))
 
   def either(self, fl, fr):
-    pass
+    ''' Map left using fl, map right using fr '''
+    if self.right: return fr(self.r)
+    if self.left: return fl(self.l)
 
   def swap(self):
-    pass
+    ''' Swap left and right '''
+    return self.either(Right, Left)
 
   def map_l(self, fl):
-    pass
-
+    ''' Map left side of this Either to Either '''
+    if self.left: return Either(fl(self.l), self.r)
+    else: return self
   def map_r(self, fr):
-    pass
+    ''' Map right side of this Either to Either '''
+    if self.right: return Either(self.l, b_v=fr(self.r))
+    else: return self
 
   def flat_map_l(self, fn):
-    pass
-
+    ''' Map left side of this Either '''
+    if self.left: return fn(self.l)
+    else: return self
   def flat_map_r(self, fn):
-    pass
+    ''' Map right side of this Either '''
+    if self.right: return fn(self.r)
+    else: return self
+
+  def __str__(self):
+    return 'Either<{}, {}>({}|{})'.format(typeof(self.l).__name__, typeof(self.r).__name__, self.l, self.r)
 
   def map(self, fl): return self.map_l(fl)
   def flat_map(self, fl): return self.flat_map_l(fl)
-
 
 def Left(a): return Either(a, None)
 def Right(b): return Either(None, b)
