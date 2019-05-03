@@ -6,7 +6,7 @@ from threading import Thread
 from collections import deque
 from time import time
 from re import compile as re_compile
-from tkinter import *
+from tkinter import Tk, Button, Entry, Label, StringVar, CENTER, END, Frame, W, X, Y, SUNKEN, FLAT
 
 from VisualGimp import __name__ as VISUAL_GIMP
 
@@ -203,7 +203,7 @@ class Gui (Thread):
     self.message.set('{} records updated'.format(changeset_count))
     self.ds.flush()
 
-  FRAME_PATTERN = re_compile(r'^(\w+) by (\w+)$')
+  FRAME_PATTERN = re_compile(r'^(\w+)\s*by\s*(\w+)$')
   def refreshFrame(self):
     refreshing = [] # name to trace record (str by lastPath)
     for k in self.ds.visualLayer.children:

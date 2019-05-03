@@ -10,7 +10,7 @@ from Util import stream_join, concat_stream, nseq, compose, uh, infseq, identity
 
 from Gui import Gui
 
-LET_RE = re_compile(r'(\w+)\s*=\s*(.+)$')
+LET_RE = re_compile(r'^\s*(\w+)\s*=\s*(.+)$')
 
 # Gimp Python Script-Fu REPL, without import path configured correctly
 def isGEPL():
@@ -159,7 +159,7 @@ class VisualGimp (GimpAccess):
   del _TEMPLATE
 
   def formatTrace(self, trace, updated = False):
-    def ensure(name): return globals()[name]
+    #def ensure(name): return globals()[name]
     ''' Make a new colored (foreground) markup for value trace '''
     #curry2 = ensure('curry2L')
     #flip = ensure('flipL')
