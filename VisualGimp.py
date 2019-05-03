@@ -12,7 +12,7 @@ from HBoxie import DictFrame
 
 from collections import deque
 
-from Util import stream_join, concat_stream, nseq, compose, uh, infseq
+from Util import stream_join, concat_stream, nseq, compose, uh, infseq, identitystar
 
 LET_RE = compile(r'(\w+)\s*=\s*(.+)$')
 
@@ -94,7 +94,7 @@ class Gui (Thread):
     self.export_code = None
     self.export = None
 
-    self.export_lambda = id #:0
+    self.export_lambda = identitystar #:0
     self.trace_edits = deque()
 
     self.trace_ptr_lastshown = {}
@@ -111,13 +111,13 @@ class Gui (Thread):
   def bind(self):
     ''' Make widgets in app thread '''
     self.ui = Tk()
-    self.sync = Button(self.ui, text = "Sync variable trace", command = self.syncClicked)
+    self.sync = Button(self.ui, text = "[F1] Sync variable trace", command = self.syncClicked)
     self.dict_view = DictFrame(self.ui)
-    self.update = Button(self.ui, text = "Commit variable trace changes", command = self.updateClicked)
-    self.publish = Button(self.ui, text = "Refresh traced arrows", command = self.refreshFrame)
-    self.code_rst = Button(self.ui, text = "Move code arrow 0", command = self.crReset)
-    self.code_mup = Button(self.ui, text = "Move code arrow ↑", command = self.crDec)
-    self.code_mdn = Button(self.ui, text = "Move code arrow ↓", command = self.crInc)
+    self.update = Button(self.ui, text = "[F2] Commit variable trace changes", command = self.updateClicked)
+    self.publish = Button(self.ui, text = "→ Refresh traced arrows", command = self.refreshFrame)
+    self.code_rst = Button(self.ui, text = "← Move code arrow", command = self.crReset)
+    self.code_mup = Button(self.ui, text = "↑ Move code arrow", command = self.crDec)
+    self.code_mdn = Button(self.ui, text = "↓ Move code arrow", command = self.crInc)
     self.cp_tvar = StringVar()
     self.cp_tvar.set(self.CODE_PTR_MESG %self.lastArrowSet)
     self.export_code = Entry(self.ui)
@@ -188,7 +188,20 @@ class Gui (Thread):
     self.bind_keys()
 
   def bind_keys(self):
-    self.ui.bin
+    ''' register key event binding for the root Tk instance '''
+    def do_ign2(fn): return lambda _: fn()
+    def bind_ign(sig, fn):
+      self.ui.bind(sig, do_ign2(fn))
+
+    bind_ign('<Left>', self.crReset)
+    bind_ign('<Right>', self.refreshFrame)
+    bind_ign('<Up>', self.crDec)
+    bind_ign('<Down>', self.crInc)
+
+    bind_ign('<Return>', self.do_export)
+
+    bind_ign('<F1>', self.syncClicked)
+    bind_ign('<F2>', self.updateClicked)
 
   def focus(self): self.ui.focus_set()
 
@@ -257,8 +270,9 @@ class Gui (Thread):
     origin = self.thisTrace
     mapped = self._convert_traceDict(self.thisTrace)
     #print(mapped)
+    msg = str()
     for key in origin.keys():
-      print(k)
+      #print(k)
       if key not in t2n or key not in mapped: continue
       ptr = mapped[key]
       layer = self.ds.pointerLayerOf(t2n[key])
@@ -269,8 +283,9 @@ class Gui (Thread):
       if not self.ds.layer_is_group(layer) or len(layer.children) <= ptr:
         self.ds.message('Failed to change cursor for {}: Not a group or length </= index {} '.format(key, ptr))
       self.ds.layer_show(layer.children[ptr])
-      self.message.set('Showing cursor {} @ position {}'.format(layer.name, ptr))
+      msg += 'Showing cursor {} @ position {}'.format(layer.name, ptr) + '\n'
       self.trace_ptr_lastshown[key] = ptr
+    self.message.set(msg)
 
   def do_export(self):
     self._export()
@@ -320,7 +335,7 @@ class Gui (Thread):
     info = list()
 
     def compile_item(name, code, info):
-      result = id #;;
+      result = identitystar #;;
       try:
         result = eval(code)
       except Exception as e:

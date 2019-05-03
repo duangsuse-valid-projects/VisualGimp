@@ -162,7 +162,22 @@ def maybe(default, fn, may):
   else: fn(may.get())
 
 identity = lambda x:x
+def identitystar(*args): return args
 typeof = type
+def sizeof(o): return o.__sizeof__()
+
+#def mk_func(): return identity.__class__(identity.func_code, {})
+
+def doall(*fns):
+  ''' return a lambda that launches all the fns '''
+  def do(fns):
+    #o = mk_func()
+    filtered = [f for f in fns if callable(f)]
+    def _ocall():
+      for f in filtered: f.__call__()
+    #o.func_code = _ocall.__code__
+    return _ocall
+  return do(fns)
 
 def fst(tup): return tup[0]
 def snd(tup): return tup[1]
