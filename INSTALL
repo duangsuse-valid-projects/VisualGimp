@@ -1,0 +1,9 @@
+Copy visualgimp.py and VisualGimp/ to:
+
+GIMP 2.10: ~/.config/GIMP/2.10/plug-ins/
+GIMP 2.8: ~/.gimp-2.8/plug-ins/
+
+# Example
+chmod +x visualgimp.py
+cp -r VisualGimp/ visualgimp.py ~/.config/GIMP/2.10/plug-ins
+
