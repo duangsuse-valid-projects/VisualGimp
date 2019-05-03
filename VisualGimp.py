@@ -101,7 +101,7 @@ class Gui (Thread):
 
   def _export(self):
     ''' increase export index for calling extension lambda '''
-    if self.export_lambda is not None: self.export_lambda(self.export_index)
+    if self.export_lambda is not None: self.export_lambda(self, self.export_index)
     self.export_index += 1
   def __convert_traceDict(self, trace):
     ''' convert and return int trace dict of indices '''
@@ -185,6 +185,10 @@ class Gui (Thread):
     self.ui.wm_attributes('-topmost')
 
     self.focus()
+    self.bind_keys()
+
+  def bind_keys(self):
+    self.ui.bin
 
   def focus(self): self.ui.focus_set()
 

@@ -15,6 +15,21 @@ def nseq(x, n):
     yield x
     n -= 1
 
+#from multiprocessing.pool import Pool
+
+def ap(f, *args, **kwargs):
+  ''' Apply a applicative object with given arguments '''
+  if len(args) == 0: return f(**kwargs)
+  fn = f; argc = len(args)
+  argp = 0
+  while callable(fn) and argp < argc:
+    if fn.func_code.co_argcount == 1:
+      fn = fn.__call__(args[argp], **kwargs)
+    else:
+      fn = fn.__call__(*args, **kwargs)
+    argp += 1
+  return fn
+
 def flip(fn): return lambda x: lambda y: fn(y, x)
 def flipL(fn): return lambda x: lambda y: fn(y)(x)
 
@@ -57,6 +72,91 @@ def uh(obj, do = lambda x: x):
   if obj is not None: return do(obj)
   else: return None
 
+def foldl(op):
+  ''' Fold left definition like the one with same name in Haskell '''
+  def foldl_init(val):
+    def foldl_ls(ls):
+      # foldl f v (x:xs) = foldl f (f v x) xs
+      #if ls == []: return val
+      def foldl_ac(head = 0):
+        if head >= len(ls): return val
+        x = ls[head]#; xs = [] if head+1 >= len(ls) else ls[head+1:len(ls)]
+        return foldl_init(op(val, x))(ls)(head+1)
+      return foldl_ac
+    return foldl_ls
+  return foldl_init
+
+class Maybe:
+  ''' Nullable value '''
+  def __init__(self, obj):
+    ''' Make a (maybe None) value wrapper '''
+    self.obj = obj
+    self.is_null = obj is None
+
+  def is_none(self):
+    ''' Return True if wrapped object is None '''
+    return self.is_null
+  def is_any(self):
+    ''' Return True if wrapped object is not None '''
+    return not self.null
+  null = property(is_none)
+  any = property(is_any)
+
+  def must_get(self):
+    ''' Get value or raise AssertionError (if none) '''
+    if self.null:
+      raise AssertionError('Object is None')
+    else: return self.obj
+
+  def get(self):
+    ''' Get value or return Nothing Maybe '''
+    if self.null: return Nothing
+    else: return self.obj
+
+  def get_or(self, fn_x_obj):
+    ''' Get value or else... (callable or alternative value) '''
+    if self.null:
+      if callable(fn_x_obj): return fn_x_obj()
+      else: return fn_x_obj
+    else: return self.obj
+
+  def flat_map(self, fn):
+    ''' If obj is null, return obj, else fn(obj) '''
+    result = fn(self.obj) if not self.null else None
+    return result
+
+  def map(self, fn):
+    ''' If obj is null, return Nothing, else compose(Maybe, fn)(obj) '''
+    return Maybe(self.flat_map(fn))
+
+  def __str__(self):
+    tt = type(self.obj) if self.any else object
+    typenam = '%s?' % tt.__name__
+    return '{}({})'.format(typenam, self.obj)
+
+  def __or__(self, other):
+    ''' this any or other any '''
+    if self.any: return self
+    else: return other
+
+  def __coerce__(self, newtype):
+    if self.any:
+      return self.get().__coerce__(newtype)
+    else:
+      raise TypeError('Cannot convert Nothing nullable to type %s' %newtype.__name__)
+
+Nothing = Maybe(None) # 没有所谓的类型，值才有类型...
+Just = Maybe
+
+def maybe(default, fn, may):
+  '''
+  takes a default value, a function, and a Maybe value. If the Maybe value is Nothing, the function returns the default value.
+  Otherwise, it applies the function to the value inside the Just and returns the result.
+  See: Maybe.flat_map
+  Equivalent: flat_map with default value
+  '''
+  if may is Nothing: return default
+  else: fn(may.get())
 
 def _trimMarks(m, bracel = '<', bracer = '>'):
   ''' remove format strs of SGML markup '''
