@@ -12,7 +12,7 @@ from HBoxie import DictFrame
 
 from collections import deque
 
-from Util import stream_join, concat_stream, nseq, compose, uh, infseq, identitystar
+from Util import stream_join, concat_stream, nseq, compose, uh, infseq, identitystar, _globalq
 
 LET_RE = compile(r'(\w+)\s*=\s*(.+)$')
 
@@ -36,11 +36,10 @@ Tk = Tk or globals()['Tk']
 # __import__('os').chdir('/home/DuangSUSE/Projects/VisualGimp/')
 # GEPL = True; execfile('GimpApi.py'); execfile('VisualGimp.py')
 
-#from __builtin___ import execfile
+#from __builtin__ import execfile
 
 require = lambda x: globals()[x]
 
-_globalq = require('_globalq')
 execfile = _globalq('execfile')
 
 from io import FileIO
