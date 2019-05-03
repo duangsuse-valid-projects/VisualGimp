@@ -51,7 +51,7 @@ plug_desc_short = plug_desc
 plug_auth = "duangsuse"
 plug_year = '2019'
 plug_copy = "Copyright (c) {} duangsuse, Licenced under the MIT License".format(plug_year)
-plug_params = [(PF_BOOL, "async", "Run in async mode", False)]
+plug_params = []#[(PF_BOOL, "async", "Run in async mode", False)]
 plug_results = []
 
 register(

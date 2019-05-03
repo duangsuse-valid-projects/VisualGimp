@@ -28,7 +28,7 @@ class GimpAccess:
     Make a new instance with gimp api module and PDB symbol module
 
     gimp: gimp API module, default from global()
-    pdb: PDB CNI binding default gimp.pdb
+    pdb: PDB (Procedure Data Base) CNI binding default gimp.pdb
     '''
     if not callable (gimp.message): raise AssertionError("Not a GIMP")
     if pdb is None: pdb = gimp.pdb
@@ -40,6 +40,10 @@ class GimpAccess:
   def message(self, text):
     ''' Show a gimp status bar message '''
     self.api.message(str(text))
+
+  def flush(self):
+    ''' Refresh GIMP canvas '''
+    self.api.displays_flush()
 
   def get_images(self):
     ''' Return a list of currently opened images '''

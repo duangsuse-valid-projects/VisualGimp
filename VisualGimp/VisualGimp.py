@@ -251,6 +251,7 @@ class Gui (Thread):
     #print(self.lastTrace)
     if changeset_count != 0: self.ds.text_layer_marks_set(self.ds.traceLayer, self.ds.formatTrace(self.lastTrace, True))
     self.message.set('{} records updated'.format(changeset_count))
+    self.ds.flush()
 
   FRAME_PATTERN = compile(r'^(\w+) by (\w+)$')
   def refreshFrame(self):
@@ -285,6 +286,7 @@ class Gui (Thread):
       msg += 'Showing cursor {} @ position {}'.format(layer.name, ptr) + '\n'
       self.trace_ptr_lastshown[key] = ptr
     self.message.set(msg)
+    self.ds.flush()
 
   def do_export(self):
     self._export()
@@ -306,6 +308,7 @@ class Gui (Thread):
     self.lastArrowSet = 0
     self.cp_tvar.set( self.CODE_PTR_MESG % 0 )
     self.codeArrow.update()
+    self.ds.flush()
     #self.cr_refresh()
   def crInc(self):
     if self.cr_overflow(1): return
@@ -316,6 +319,7 @@ class Gui (Thread):
     self.lastArrowSet += 1
     self.cp_tvar.set( self.CODE_PTR_MESG % (last + 1) )
     self.codeArrow.update()
+    self.ds.flush()
     #self.cr_refresh()
   def crDec(self):
     if self.cr_overflow(-1): return
@@ -325,6 +329,7 @@ class Gui (Thread):
     self.ds.layer_show(children[last - 1])
     self.lastArrowSet -= 1
     self.cp_tvar.set( self.CODE_PTR_MESG % (last - 1) )
+    self.ds.flush()
     #self.codeArrow.update()
     #self.cr_refresh()
 
