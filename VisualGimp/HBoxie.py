@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 # coding: utf-8
 
 from tkinter import Frame, LEFT, RIGHT, Label, Entry, Button, END
