@@ -72,6 +72,9 @@ def uh(obj, do = lambda x: x):
   if obj is not None: return do(obj)
   else: return None
 
+def coerce(x, t): return x.__coerce__(t)
+def unreachable(): raise RuntimeError('Corrupted state : Impossible code path reached !!!')
+
 def foldl(op):
   ''' Fold left definition like the one with same name in Haskell '''
   def foldl_init(val):
@@ -157,6 +160,78 @@ def maybe(default, fn, may):
   '''
   if may is Nothing: return default
   else: fn(may.get())
+
+def fst(tup): return tup[0]
+def snd(tup): return tup[1]
+
+def lastindex(xs): return len(xs) -1
+def head(xs, off=0): return xs[off]
+def tail(xs, off=0): return xs[off+1:lastindex(xs)]
+
+def first_just(ls):
+  ''' Find first Just in a maybe list '''
+  if type(ls) is list:
+    return foldl(Maybe.__or__)(Nothing)(ls)()
+  else:
+    res = filter(Maybe.is_any, ls)
+    if len(res) is 0: return Nothing
+    else: return iter(res).next()
+
+class Either:
+  ''' Either value a or b '''
+  def __init__(self, a_v, b_v):
+    self.a = a_v; self.b = b_v
+
+  def is_left(self):
+    pass
+  def is_right(self):
+    pass
+
+  left = property(is_left)
+  right = property(is_right)
+
+  def get_left_or(self, fn_x_v):
+    pass
+  def get_right_or(self, fn_x_v):
+    pass
+
+  def get_left(self):
+    pass
+  def get_right(self):
+    pass
+
+  l = property(get_left)
+  r = property(get_right)
+
+  def must_get_left(self):
+    pass
+  def must_get_right(self):
+    pass
+
+  def either(self, fl, fr):
+    pass
+
+  def swap(self):
+    pass
+
+  def map_l(self, fl):
+    pass
+
+  def map_r(self, fr):
+    pass
+
+  def flat_map_l(self, fn):
+    pass
+
+  def flat_map_r(self, fn):
+    pass
+
+  def map(self, fl): return self.map_l(fl)
+  def flat_map(self, fl): return self.flat_map_l(fl)
+
+
+def Left(a): return Either(a, None)
+def Right(b): return Either(None, b)
 
 def _trimMarks(m, bracel = '<', bracer = '>'):
   ''' remove format strs of SGML markup '''
