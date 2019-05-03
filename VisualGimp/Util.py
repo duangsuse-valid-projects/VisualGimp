@@ -16,6 +16,29 @@ def nseq(x, n):
     yield x
     n -= 1
 
+def may_slice(ary, ind):
+  ''' if slice in array bound, return array[slice], else return retrofit slice '''
+  if type(ind) is not slice: return
+  if type(ary) is not list: return
+  # start stop /step
+  start = ind.start
+  stop = ind.stop
+  len_list = len(ary)
+  if start < 0:
+    # negative: list[-1] = list[len(list) - 1]
+    if start <= -len_list:
+      return ary[0:stop]
+  else:
+    startovf = start >= len_list
+    endovf = stop >= len_list
+    if startovf or endovf:
+      if startovf and endovf:
+        return []
+      elif startovf:
+        return ary[startovf-len_list:stop]
+      elif endovf:
+        return ary[start:-1]
+
 #from multiprocessing.pool import Pool
 
 def ap(f, *args, **kwargs):

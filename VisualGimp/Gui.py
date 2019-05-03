@@ -10,7 +10,7 @@ from tkinter import Tk, Button, Entry, Label, StringVar, CENTER, END, Frame, W, 
 
 from VisualGimp import __name__ as VISUAL_GIMP
 
-from Util import identitystar, compose, uh, concat_stream, stream_join, infseq
+from Util import identitystar, compose, uh, concat_stream, stream_join, infseq, doall, may_slice
 from HBoxie import DictFrame
 
 class Gui (Thread):
@@ -71,7 +71,8 @@ class Gui (Thread):
     self.cp_tvar.set(self.CODE_PTR_MESG %self.lastArrowSet)
     self.export_code = Entry(self.ui)
     self.convert_trace_code = Entry(self.ui)
-    self.btn_update_codes = Button(self.ui, text = "Compile", command = self.updateConverter, justify=CENTER)
+    # 我的意思是，如果用户输入 lambda，不就直接是 Compile 了吗？ 🤗
+    self.btn_update_codes = Button(self.ui, text = "📓 Compile", command = self.updateConverter, justify=CENTER)
     self.export = Button(self.ui, text = "✔ Export Frame", command = self.do_export)
     self.message = StringVar()
     self.message_view = Label(self.ui, textvariable=self.message, justify=CENTER, fg="green")
@@ -146,6 +147,7 @@ class Gui (Thread):
     bind_ign('<Right>', self.refreshFrame)
     bind_ign('<Up>', self.crDec)
     bind_ign('<Down>', self.crInc)
+    self.ui.bind('<Tab>', do_ign2(doall(self.updateClicked, self.refreshFrame)))
 
     bind_ign('<Return>', self.do_export)
 
@@ -174,7 +176,7 @@ class Gui (Thread):
       try:
         evaluated = compose(str, eval)(newvalue)
       except Exception as e:
-        evaluated = str(e)
+        evaluated = may_slice(str(e), slice(0, 15))
       newdict[key] = evaluated
       self.message.set('records[{}] = {} evaluated to {}'.format(key, newvalue, evaluated))
       field = self.dict_view.ivs[index].b
@@ -231,7 +233,7 @@ class Gui (Thread):
         self.ds.layer_hide(layer.children[self.trace_ptr_lastshown[key]])
 
       if not self.ds.layer_is_group(layer) or len(layer.children) <= ptr:
-        self.ds.message('Failed to change cursor for {}: Not a group or length </= index {} '.format(key, ptr))
+        self.ds.message('Failed to change cursor for {}({}): Not a group or length </= index {} '.format(key, t2n[key], ptr))
       self.ds.layer_show(layer.children[ptr])
       msg += 'Showing cursor {} @ position {}'.format(layer.name, ptr) + '\n'
       self.trace_ptr_lastshown[key] = ptr
