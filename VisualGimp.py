@@ -219,9 +219,10 @@ class Gui (Thread):
         if key not in self.lastTrace or newdict[key] != self.lastTrace[key]:
           changed = True
           break
-      if changed: self.trace_edits.append((key, evaluated))
+      if changed:
+        self.trace_edits.append((key, evaluated))
+        self.thisTrace[key] = evaluated # apply changes to current map
       #print(key, newvalue)
-      self.thisTrace[key] = evaluated # apply changes to current map
     return listener
 
   def updateClicked(self):
