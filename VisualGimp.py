@@ -224,29 +224,31 @@ class Gui (Thread):
     #print(old)
     if changeset_count != 0: self.ds.text_layer_marks_set(self.ds.traceLayer, self.ds.formatTrace(old, True))
 
-  FRAME_PATTERN = compile(r'^(\w+) by (\w)+$')
+  FRAME_PATTERN = compile(r'^(\w+) by (\w+)$')
   def refreshFrame(self):
     refreshing = [] # name to trace record (str by lastPath)
     for k in self.ds.visualLayer.children:
       spec = k.name
       m = self.FRAME_PATTERN.match(spec)
-      groups = m.groups()
-      if len(groups) == 2:
+      groups = uh(m, lambda m: m.groups())
+      if groups is not None and len(groups) == 2:
         refreshing.append((groups[1], groups[0]))
       else:
-        self.ds.message('Failed matching name {}, try follow pattern of pointerName by traceVariable?'.format(k))
+        self.ds.message('Failed matching name {}, try follow pattern of `pointerName by traceVariable`?'.format(spec))
 
     t2n = dict(refreshing)
-    print(t2n)
+    #print(t2n)
     origin = self.thisTrace
     mapped = self._convert_traceDict(self.thisTrace)
+    #print(mapped)
     for key in origin.keys():
-      if key not in t2n: continue
+      print(k)
+      if key not in t2n or key not in mapped: continue
       ptr = mapped[key]
       layer = self.ds.pointerLayerOf(t2n[key])
-      print(ptr, layer)
+      #print(ptr, layer)
       if key in self.trace_ptr_lastshown:
-        self.ds.layer_hide(self.trace_ptr_lastshown[key])
+        self.ds.layer_hide(layer.children[self.trace_ptr_lastshown[key]])
 
       if not self.ds.layer_is_group(layer) or len(layer.children) <= ptr:
         self.ds.message('Failed to change cursor for {}: Not a group or length </= index {} '.format(key, ptr))
