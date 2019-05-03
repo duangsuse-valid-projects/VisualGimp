@@ -55,8 +55,8 @@ class DictFrame:
     ''' Draw dict frame list UI '''
     if len(self.dict) is 0: return
     index = 0
-    b = lambda p: Button(p, text='✔', command=self.call_changed(index))
     for (k, v) in self.dict.items():
+      b = lambda p: Button(p, text='✔', command=self.call_changed(index))
       iv = TripleFrame(self.parent, lambda f: Label(f, text=k), lambda f: Entry(f, text='set %s' %k), b)
       iv.b.delete(0, END)
       iv.b.insert(0, v)

@@ -113,7 +113,7 @@ class Gui (Thread):
     self.ui = Tk()
     self.sync = Button(self.ui, text = "Sync variable trace", command = self.syncClicked)
     self.dict_view = DictFrame(self.ui)
-    self.update = Button(self.ui, text = "Update variable trace", command = self.updateClicked)
+    self.update = Button(self.ui, text = "Commit variable trace changes", command = self.updateClicked)
     self.publish = Button(self.ui, text = "Refresh traced arrows", command = self.refreshFrame)
     self.code_rst = Button(self.ui, text = "Move code arrow 0", command = self.crReset)
     self.code_mup = Button(self.ui, text = "Move code arrow ↑", command = self.crDec)
@@ -194,7 +194,7 @@ class Gui (Thread):
     if traces is None:
       self.message.set('Cannot read trace pattern!')
       return
-    self.lastTrace = self.thisTrace
+    self.lastTrace = traces if self.lastTrace is None else self.thisTrace
     self.thisTrace = traces
     self.dict_view.destroy()
     self.dict_view = DictFrame(self.ui, traces)
@@ -203,26 +203,37 @@ class Gui (Thread):
 
   def updateTrace(self):
     def listener(index, key, oldvalue, newvalue):
+      newdict = self.thisTrace.copy()
+      evaluated = ':('
+      try:
+        evaluated = compose(str, eval)(newvalue)
+      except Exception as e:
+        evaluated = str(e)
+      newdict[key] = evaluated
+      self.message.set('records[{}] = {} evaluated to {}'.format(key, newvalue, evaluated))
+      field = self.dict_view.ivs[index].b
+      field.delete(0, END)
+      field.insert(0, evaluated)
       changed = False
-      for key in self.thisTrace.keys():
-        if key not in self.lastTrace or self.thisTrace[key] != self.lastTrace[key]:
+      for key in newdict:
+        if key not in self.lastTrace or newdict[key] != self.lastTrace[key]:
           changed = True
           break
-      if changed: self.trace_edits.append((key, newvalue))
+      if changed: self.trace_edits.append((key, evaluated))
       #print(key, newvalue)
-      self.thisTrace[key] = newvalue # apply changes to current map
+      self.thisTrace[key] = evaluated # apply changes to current map
     return listener
 
   def updateClicked(self):
-    old = self.thisTrace.copy()
     changeset_count = 0
     while len(self.trace_edits) !=0:
       (k, nv) = self.trace_edits.popleft()
-      old[k] = nv
-      self.lastTrace[k] = nv # GIMP textual trace repr
+      #print((k, nv))
+      self.lastTrace[k] = nv # Update GIMP textual trace repr
       changeset_count += 1
-    #print(old)
-    if changeset_count != 0: self.ds.text_layer_marks_set(self.ds.traceLayer, self.ds.formatTrace(old, True))
+    #print(self.lastTrace)
+    if changeset_count != 0: self.ds.text_layer_marks_set(self.ds.traceLayer, self.ds.formatTrace(self.lastTrace, True))
+    self.message.set('{} records updated'.format(changeset_count))
 
   FRAME_PATTERN = compile(r'^(\w+) by (\w+)$')
   def refreshFrame(self):
@@ -253,6 +264,7 @@ class Gui (Thread):
       if not self.ds.layer_is_group(layer) or len(layer.children) <= ptr:
         self.ds.message('Failed to change cursor for {}: Not a group or length </= index {} '.format(key, ptr))
       self.ds.layer_show(layer.children[ptr])
+      self.message.set('Showing cursor {} @ position {}'.format(layer.name, ptr))
       self.trace_ptr_lastshown[key] = ptr
 
   def do_export(self):
